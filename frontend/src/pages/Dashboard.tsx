@@ -1,9 +1,11 @@
+import MainLayout from "../layouts/MainLayout";
+
 function Dashboard() {
   return (
-    <div>
+    <MainLayout>
       <h1>Dashboard</h1>
-      <p>Overview of HR operations</p>
-    </div>
+      <p>Welcome to the Agentic AI HR Management System.</p>
+    </MainLayout>
   );
 }
 
