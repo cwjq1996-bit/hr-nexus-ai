@@ -10,6 +10,19 @@ build/
 .env.*
 !.env.example
 
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Vendored Python source tree that was extracted into the project folder
+Python-3.14.8/
+
 # Logs
 *.log
 npm-debug.log*
