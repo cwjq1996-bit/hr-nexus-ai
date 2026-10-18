@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     debug: bool = True
 
+    # Optional so the API still starts without a database configured.
+    # Example: postgresql+psycopg://user:password@localhost:5432/hris
+    database_url: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
