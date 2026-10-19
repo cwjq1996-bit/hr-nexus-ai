@@ -1,6 +1,7 @@
 type Props = {
   label: string;
-  value: number;
+  // A string lets a card show "…" while loading or "–" when unavailable.
+  value: number | string;
   hint?: string;
 };
 
