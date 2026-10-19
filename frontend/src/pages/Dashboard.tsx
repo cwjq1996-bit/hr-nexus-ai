@@ -1,13 +1,26 @@
-import MainLayout from "../layouts/MainLayout";
+import { useEffect, useState } from "react";
+
+import { errorMessage, fetchEmployees } from "../api/employees";
+import type { EmployeeFilters } from "../api/employees";
 import StatCard from "../components/StatCard";
 import {
   candidates,
   departments,
-  employees,
+  employees as sampleEmployees,
   jobOpenings,
   leaveRequests,
   recentActivity,
 } from "../data/mockData";
+import MainLayout from "../layouts/MainLayout";
+import type { Employee } from "../types/hr";
+
+const NO_FILTERS: EmployeeFilters = { search: "", department: "", status: "" };
+
+type Result = {
+  attempt: number;
+  employees: Employee[] | null;
+  error: string | null;
+};
 
 const panelStyle = {
   flex: "1 1 360px",
@@ -35,7 +48,29 @@ function formatDate(iso: string) {
 }
 
 function Dashboard() {
-  const employeeById = new Map(employees.map((e) => [e.id, e] as const));
+  const [attempt, setAttempt] = useState(0);
+  const [result, setResult] = useState<Result | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchEmployees(NO_FILTERS, controller.signal)
+      .then((employees) => setResult({ attempt, employees, error: null }))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setResult({ attempt, employees: null, error: errorMessage(error) });
+      });
+
+    return () => controller.abort();
+  }, [attempt]);
+
+  // Loading is derived: the stored result belongs to an earlier attempt.
+  const loading = result === null || result.attempt !== attempt;
+  const employees = loading ? null : result.employees;
+  const error = loading ? null : result.error;
+
+  // Leave requests are still sample data and refer to sample employee ids.
+  const sampleEmployeeById = new Map(sampleEmployees.map((e) => [e.id, e] as const));
 
   const openRoleCount = jobOpenings.reduce((sum, job) => sum + job.openings, 0);
   const activeCandidates = candidates.filter(
@@ -43,12 +78,18 @@ function Dashboard() {
   );
   const pendingLeave = leaveRequests.filter((r) => r.status === "Pending");
 
-  const headcountByDepartment = departments.map((department) => ({
-    department,
-    count: employees.filter((e) => e.department === department).length,
-  }));
+  const placeholder = loading ? "…" : "–";
+  const unavailableHint = loading ? "Loading…" : "Unavailable";
+
+  const onLeaveCount = employees?.filter((e) => e.status === "On leave").length;
+  const headcountByDepartment = employees
+    ? departments.map((department) => ({
+        department,
+        count: employees.filter((e) => e.department === department).length,
+      }))
+    : null;
   const largestDepartment = Math.max(
-    ...headcountByDepartment.map((d) => d.count),
+    ...(headcountByDepartment ?? []).map((d) => d.count),
     1,
   );
 
@@ -66,8 +107,41 @@ function Dashboard() {
           Dashboard
         </h1>
         <p style={{ ...mutedStyle, marginBottom: "24px" }}>
-          Welcome to the Agentic AI HR Management System. Showing sample data.
+          Welcome to the Agentic AI HR Management System. Headcount comes from
+          the API. Leave, recruitment and activity are still sample data.
         </p>
+
+        {error ? (
+          <div
+            role="alert"
+            style={{
+              backgroundColor: "#fef2f2",
+              border: "1px solid #fecaca",
+              color: "#b91c1c",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              marginBottom: "24px",
+              fontSize: "14px",
+            }}
+          >
+            {error}{" "}
+            <button
+              type="button"
+              onClick={() => setAttempt((count) => count + 1)}
+              style={{
+                marginLeft: "8px",
+                padding: "4px 12px",
+                border: "1px solid #fca5a5",
+                borderRadius: "6px",
+                backgroundColor: "white",
+                color: "#b91c1c",
+                cursor: "pointer",
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
 
         <div
           style={{
@@ -79,65 +153,75 @@ function Dashboard() {
         >
           <StatCard
             label="Headcount"
-            value={employees.length}
-            hint={`${employees.filter((e) => e.status === "On leave").length} currently on leave`}
+            value={employees ? employees.length : placeholder}
+            hint={
+              onLeaveCount !== undefined
+                ? `${onLeaveCount} currently on leave`
+                : unavailableHint
+            }
           />
           <StatCard
             label="Open roles"
             value={openRoleCount}
-            hint={`${jobOpenings.length} job postings`}
+            hint={`${jobOpenings.length} job postings (sample)`}
           />
           <StatCard
             label="Candidates in pipeline"
             value={activeCandidates.length}
-            hint="Excludes hired and rejected"
+            hint="Excludes hired and rejected (sample)"
           />
           <StatCard
             label="Pending leave requests"
             value={pendingLeave.length}
-            hint="Waiting for approval"
+            hint="Waiting for approval (sample)"
           />
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
           <section style={panelStyle}>
             <h2 style={panelTitleStyle}>Headcount by department</h2>
-            {headcountByDepartment.map(({ department, count }) => (
-              <div key={department} style={{ marginBottom: "12px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "14px",
-                    color: "#334155",
-                    marginBottom: "4px",
-                  }}
-                >
-                  <span>{department}</span>
-                  <span>{count}</span>
-                </div>
-                <div
-                  style={{
-                    height: "8px",
-                    borderRadius: "4px",
-                    backgroundColor: "#e2e8f0",
-                  }}
-                >
+            {headcountByDepartment ? (
+              headcountByDepartment.map(({ department, count }) => (
+                <div key={department} style={{ marginBottom: "12px" }}>
                   <div
                     style={{
-                      height: "100%",
-                      width: `${(count / largestDepartment) * 100}%`,
-                      borderRadius: "4px",
-                      backgroundColor: "#3b82f6",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "14px",
+                      color: "#334155",
+                      marginBottom: "4px",
                     }}
-                  />
+                  >
+                    <span>{department}</span>
+                    <span>{count}</span>
+                  </div>
+                  <div
+                    style={{
+                      height: "8px",
+                      borderRadius: "4px",
+                      backgroundColor: "#e2e8f0",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${(count / largestDepartment) * 100}%`,
+                        borderRadius: "4px",
+                        backgroundColor: "#3b82f6",
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p style={mutedStyle}>
+                {loading ? "Loading…" : "Department figures are unavailable."}
+              </p>
+            )}
           </section>
 
           <section style={panelStyle}>
-            <h2 style={panelTitleStyle}>Pending leave requests</h2>
+            <h2 style={panelTitleStyle}>Pending leave requests (sample)</h2>
             {pendingLeave.length === 0 ? (
               <p style={mutedStyle}>Nothing waiting for approval.</p>
             ) : (
@@ -150,7 +234,7 @@ function Dashboard() {
                   }}
                 >
                   <div style={{ fontSize: "15px", color: "#0f172a" }}>
-                    {employeeById.get(request.employeeId)?.name ?? "Unknown"}
+                    {sampleEmployeeById.get(request.employeeId)?.name ?? "Unknown"}
                   </div>
                   <div style={mutedStyle}>
                     {request.type} leave, {formatDate(request.startDate)} to{" "}
@@ -163,7 +247,7 @@ function Dashboard() {
           </section>
 
           <section style={panelStyle}>
-            <h2 style={panelTitleStyle}>Recent activity</h2>
+            <h2 style={panelTitleStyle}>Recent activity (sample)</h2>
             {recentActivity.map((item) => (
               <div
                 key={item.id}
