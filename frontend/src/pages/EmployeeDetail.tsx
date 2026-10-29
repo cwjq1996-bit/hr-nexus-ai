@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { ApiError, errorMessage, fetchEmployee } from "../api/employees";
+import { useAuth } from "../auth/useAuth";
 import StatusBadge from "../components/StatusBadge";
 import MainLayout from "../layouts/MainLayout";
 import type { Employee } from "../types/hr";
@@ -45,6 +46,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [result, setResult] = useState<Result | null>(null);
 
   useEffect(() => {
@@ -75,9 +77,12 @@ function EmployeeDetail() {
   return (
     <MainLayout>
       <div style={{ textAlign: "left" }}>
-        <Link to="/employees" style={{ color: "#1d4ed8", fontSize: "14px" }}>
-          ← Back to employees
-        </Link>
+        {/* Only administrators can open the employee list. */}
+        {user?.role === "Admin" ? (
+          <Link to="/employees" style={{ color: "#1d4ed8", fontSize: "14px" }}>
+            ← Back to employees
+          </Link>
+        ) : null}
 
         {loading ? (
           <p style={{ color: "#64748b", marginTop: "24px" }}>
